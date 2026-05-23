@@ -1,0 +1,1 @@
+print("Work Tracker iniciado!")
