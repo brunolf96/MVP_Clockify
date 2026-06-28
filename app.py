@@ -62,7 +62,15 @@ class EntryDialog(QDialog):
         form_layout.addRow("Início:", self.start_input)
         form_layout.addRow("Fim:", self.end_input)
 
-        button_box = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+        )
+        save_button = button_box.button(QDialogButtonBox.StandardButton.Save)
+        cancel_button = button_box.button(QDialogButtonBox.StandardButton.Cancel)
+        if save_button:
+            save_button.setText("Salvar")
+        if cancel_button:
+            cancel_button.setText("Cancelar")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
 
@@ -102,7 +110,7 @@ class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
 
-        self.setWindowTitle("Work Time Tracker")
+        self.setWindowTitle("Gerenciador de tempo")
         self.setGeometry(100, 100, 1100, 620)
 
         self.timer = TimerManager()
@@ -132,11 +140,11 @@ class MainWindow(QWidget):
         self.elapsed_label = QLabel("Tempo: 00:00:00")
         self.today_label = QLabel("Hoje: 00:00:00")
 
-        self.start_btn = QPushButton("START")
-        self.stop_btn = QPushButton("STOP")
-        self.report_btn = QPushButton("RELATÓRIO")
-        self.summary_btn = QPushButton("RESUMO")
-        self.refresh_btn = QPushButton("ATUALIZAR")
+        self.start_btn = QPushButton("Iniciar")
+        self.stop_btn = QPushButton("Parar")
+        self.report_btn = QPushButton("Relatório")
+        self.summary_btn = QPushButton("Resumo")
+        self.refresh_btn = QPushButton("Atualizar")
 
         self.start_btn.clicked.connect(self.start_timer)
         self.stop_btn.clicked.connect(self.stop_timer)
@@ -151,10 +159,10 @@ class MainWindow(QWidget):
         buttons_layout.addWidget(self.summary_btn)
         buttons_layout.addWidget(self.refresh_btn)
 
-        self.manual_btn = QPushButton("REGISTRO MANUAL")
-        self.edit_btn = QPushButton("EDITAR")
-        self.delete_btn = QPushButton("EXCLUIR")
-        self.export_btn = QPushButton("EXPORTAR CSV")
+        self.manual_btn = QPushButton("Registro manual")
+        self.edit_btn = QPushButton("Editar")
+        self.delete_btn = QPushButton("Excluir")
+        self.export_btn = QPushButton("Exportar CSV")
 
         self.manual_btn.clicked.connect(self.create_manual_entry)
         self.edit_btn.clicked.connect(self.edit_selected_entry)
@@ -182,8 +190,8 @@ class MainWindow(QWidget):
         self.filter_end_date.setDisplayFormat("dd/MM/yyyy")
         self.filter_end_date.setDate(QDate.currentDate())
 
-        self.filter_btn = QPushButton("FILTRAR")
-        self.clear_filter_btn = QPushButton("LIMPAR")
+        self.filter_btn = QPushButton("Filtrar")
+        self.clear_filter_btn = QPushButton("Limpar")
         self.filter_btn.clicked.connect(self.refresh_history)
         self.clear_filter_btn.clicked.connect(self.clear_filters)
 
@@ -382,7 +390,7 @@ class MainWindow(QWidget):
 
     def export_csv(self):
         path, _ = QFileDialog.getSaveFileName(
-            self, "Salvar relatório CSV", "", "CSV Files (*.csv)"
+            self, "Salvar relatório CSV", "", "Arquivos CSV (*.csv)"
         )
         if not path:
             return

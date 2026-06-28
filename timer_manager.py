@@ -19,7 +19,7 @@ class TimerManager:
         self.project = project
         self.description = description
 
-        print(f"Timer iniciado: {project} às {self.start_time}")
+        print(f"Temporizador iniciado: {project} às {self.start_time}")
 
     def stop(self):
         if not self.running:
@@ -30,7 +30,7 @@ class TimerManager:
 
         self._save_entry(end_time, duration)
 
-        print(f"Timer parado: duração {duration/60:.2f} minutos")
+        print(f"Temporizador parado: duração {duration/60:.2f} minutos")
 
         self.running = False
         self.start_time = None
