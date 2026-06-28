@@ -317,7 +317,12 @@ class MainWindow(QWidget):
         for row_index, row in enumerate(entries):
             for column_index, value in enumerate(row):
                 cell_text = str(value or "")
-                if column_index == 5:
+                if column_index in (3, 4) and value:
+                    try:
+                        cell_text = datetime.fromisoformat(value).strftime("%Y-%m-%d | %H:%M:%S")
+                    except (TypeError, ValueError):
+                        cell_text = str(value or "")
+                elif column_index == 5:
                     cell_text = format_seconds(value or 0)
                     total_seconds += value or 0
                 item = QTableWidgetItem(cell_text)
