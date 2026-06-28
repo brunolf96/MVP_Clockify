@@ -75,7 +75,7 @@ def fetch_entries(project=None, start_date=None, end_date=None, match_mode="exac
         query += " AND date(start_time) <= date(?)"
         params.append(end_date)
 
-    query += " ORDER BY start_time DESC"
+    query += " ORDER BY start_time DESC, id DESC"
 
     cursor.execute(query, params)
     rows = cursor.fetchall()

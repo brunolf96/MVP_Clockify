@@ -215,6 +215,7 @@ class MainWindow(QWidget):
         self.history_table.setHorizontalHeaderLabels([
             "ID", "Projeto", "Descrição", "Início", "Fim", "Duração"
         ])
+        self.history_table.setColumnHidden(0, True)
         header = self.history_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
         self.history_table.setSelectionBehavior(QTableWidget.SelectRows)
@@ -322,7 +323,12 @@ class MainWindow(QWidget):
         total_seconds = 0
 
         for row_index, row in enumerate(entries):
-            for column_index, value in enumerate(row):
+            row_id = row[0]
+            id_item = QTableWidgetItem(str(row_id))
+            id_item.setTextAlignment(Qt.AlignCenter)
+            self.history_table.setItem(row_index, 0, id_item)
+
+            for column_index, value in enumerate(row[1:], start=1):
                 cell_text = str(value or "")
                 if column_index in (3, 4) and value:
                     try:
@@ -347,15 +353,18 @@ class MainWindow(QWidget):
         self.refresh_history()
 
     def on_entry_selected(self):
-        selected = self.history_table.selectedItems()
-        if selected:
-            self.selected_entry_id = int(selected[0].text())
-            self.edit_btn.setEnabled(True)
-            self.delete_btn.setEnabled(True)
-        else:
-            self.selected_entry_id = None
-            self.edit_btn.setEnabled(False)
-            self.delete_btn.setEnabled(False)
+        selected_row = self.history_table.currentRow()
+        if selected_row >= 0:
+            id_item = self.history_table.item(selected_row, 0)
+            if id_item is not None:
+                self.selected_entry_id = int(id_item.text())
+                self.edit_btn.setEnabled(True)
+                self.delete_btn.setEnabled(True)
+                return
+
+        self.selected_entry_id = None
+        self.edit_btn.setEnabled(False)
+        self.delete_btn.setEnabled(False)
 
     def create_manual_entry(self):
         dialog = EntryDialog(self)
