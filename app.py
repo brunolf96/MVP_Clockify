@@ -6,7 +6,8 @@ from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QPushButton, QComboBox, QLineEdit, QLabel, QMessageBox,
     QTableWidget, QTableWidgetItem, QFileDialog, QHeaderView,
-    QDialog, QDialogButtonBox, QDateEdit, QDateTimeEdit, QCheckBox
+    QDialog, QDialogButtonBox, QDateEdit, QDateTimeEdit, QCheckBox,
+    QMenu, QAction
 )
 
 from database import (
@@ -220,9 +221,13 @@ class MainWindow(QWidget):
         self.history_table.setColumnHidden(0, True)
         header = self.history_table.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.Stretch)
-        self.history_table.setSelectionBehavior(QTableWidget.SelectRows)
+        self.history_table.setSelectionBehavior(QTableWidget.SelectItems)
+        self.history_table.setSelectionMode(QTableWidget.ExtendedSelection)
         self.history_table.setEditTriggers(QTableWidget.NoEditTriggers)
         self.history_table.setSortingEnabled(True)
+        self.history_table.setFocusPolicy(Qt.StrongFocus)
+        self.history_table.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.history_table.customContextMenuRequested.connect(self.show_history_table_context_menu)
         self.history_table.itemSelectionChanged.connect(self.on_entry_selected)
 
         self.summary_label = QLabel("Total: 00:00:00")
@@ -234,7 +239,7 @@ class MainWindow(QWidget):
         self.column_preferences_layout.addWidget(QLabel("Colunas visíveis:"))
 
         self.column_checkboxes = {}
-        for column_name in ["Projeto", "Descrição", "Início", "Fim", "Duração"]:
+        for column_name in ["Data", "Início", "Fim", "Projeto", "Descrição", "Duração"]:
             checkbox = QCheckBox(column_name)
             checkbox.setChecked(column_name in self.visible_columns)
             checkbox.toggled.connect(self.apply_column_visibility)
@@ -344,7 +349,7 @@ class MainWindow(QWidget):
         save_visible_columns(self.visible_columns)
 
     def update_table_columns(self):
-        column_names = ["Projeto", "Descrição", "Início", "Fim", "Duração"]
+        column_names = ["Data", "Início", "Fim", "Projeto", "Descrição", "Duração"]
         visible_columns = [name for name in column_names if name in self.visible_columns]
         self.history_table.setColumnCount(len(visible_columns) + 1)
         self.history_table.setHorizontalHeaderLabels(["ID"] + visible_columns)
@@ -378,7 +383,7 @@ class MainWindow(QWidget):
                     source_index = 1
                 elif column_name == "Descrição":
                     source_index = 2
-                elif column_name == "Início":
+                elif column_name in {"Data", "Início"}:
                     source_index = 3
                 elif column_name == "Fim":
                     source_index = 4
@@ -390,9 +395,19 @@ class MainWindow(QWidget):
 
                 value = row[source_index]
                 cell_text = str(value or "")
-                if column_name in {"Início", "Fim"} and value:
+                if column_name == "Data" and value:
                     try:
-                        cell_text = datetime.fromisoformat(value).strftime("%Y-%m-%d | %H:%M:%S")
+                        cell_text = datetime.fromisoformat(value).strftime("%Y-%m-%d")
+                    except (TypeError, ValueError):
+                        cell_text = str(value or "")
+                elif column_name == "Início" and value:
+                    try:
+                        cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
+                    except (TypeError, ValueError):
+                        cell_text = str(value or "")
+                elif column_name == "Fim" and value:
+                    try:
+                        cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
                     except (TypeError, ValueError):
                         cell_text = str(value or "")
                 elif column_name == "Duração":
@@ -405,6 +420,34 @@ class MainWindow(QWidget):
 
         self.summary_label.setText(f"Total: {format_seconds(total_seconds)}")
         self.update_today_label()
+
+    def show_history_table_context_menu(self, position):
+        selected_items = self.history_table.selectedItems()
+        if not selected_items:
+            return
+
+        menu = QMenu(self)
+        copy_action = QAction("Copiar", self)
+        copy_action.triggered.connect(self.copy_selected_history_cells)
+        menu.addAction(copy_action)
+        menu.exec(self.history_table.viewport().mapToGlobal(position))
+
+    def copy_selected_history_cells(self):
+        selected_items = self.history_table.selectedItems()
+        if not selected_items:
+            return
+
+        rows = sorted({item.row() for item in selected_items})
+        cols = sorted({item.column() for item in selected_items})
+        lines = []
+        for row in rows:
+            line = []
+            for col in cols:
+                item = self.history_table.item(row, col)
+                line.append(item.text() if item is not None else "")
+            lines.append("\t".join(line))
+
+        QApplication.clipboard().setText("\n".join(lines))
 
     def refresh_history(self):
         self.load_project_list()
