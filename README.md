@@ -20,16 +20,31 @@ Este projeto permite controlar tempo de trabalho por projeto no computador usand
 
 ## Como rodar
 
-1. Ative seu ambiente Python.
-2. Instale dependências:
+### Windows
 
-```bash
-pip install -r requirements.txt
+1. Abra o Prompt de Comando na pasta do projeto.
+2. Execute o script preparado para Windows:
+
+```bat
+run_windows.bat
 ```
 
-3. Execute o aplicativo:
+Ou, manualmente:
+
+```bat
+py -3 -m venv .venv
+.venv\Scripts\activate.bat
+python -m pip install --upgrade pip
+python -m pip install -r requirements.txt
+python app.py
+```
+
+### Linux/macOS
 
 ```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
 python app.py
 ```
 

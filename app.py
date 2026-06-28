@@ -2,12 +2,13 @@ import sys
 from datetime import date, datetime
 
 from PySide6.QtCore import QTimer, Qt, QDate, QDateTime
+from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QPushButton, QComboBox, QLineEdit, QLabel, QMessageBox,
     QTableWidget, QTableWidgetItem, QFileDialog, QHeaderView,
     QDialog, QDialogButtonBox, QDateEdit, QDateTimeEdit, QCheckBox,
-    QMenu, QAction
+    QMenu
 )
 
 from database import (
