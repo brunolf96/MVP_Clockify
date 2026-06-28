@@ -182,6 +182,10 @@ class MainWindow(QWidget):
         self.filter_project_input = QLineEdit()
         self.filter_project_input.setPlaceholderText("Filtrar por projeto")
 
+        self.filter_mode_combo = QComboBox()
+        self.filter_mode_combo.addItems(["Exato", "Parcial"])
+        self.filter_mode_combo.setCurrentText("Exato")
+
         self.filter_start_date = QDateEdit(calendarPopup=True)
         self.filter_start_date.setDisplayFormat("dd/MM/yyyy")
         self.filter_start_date.setDate(QDate(2000, 1, 1))
@@ -198,6 +202,8 @@ class MainWindow(QWidget):
         filter_layout = QHBoxLayout()
         filter_layout.addWidget(QLabel("Projeto:"))
         filter_layout.addWidget(self.filter_project_input)
+        filter_layout.addWidget(QLabel("Modo:"))
+        filter_layout.addWidget(self.filter_mode_combo)
         filter_layout.addWidget(QLabel("De:"))
         filter_layout.addWidget(self.filter_start_date)
         filter_layout.addWidget(QLabel("Até:"))
@@ -304,8 +310,9 @@ class MainWindow(QWidget):
         project_filter = self.filter_project_input.text().strip() or None
         start_date = self.filter_start_date.date().toString(Qt.ISODate)
         end_date = self.filter_end_date.date().toString(Qt.ISODate)
+        match_mode = "partial" if self.filter_mode_combo.currentText() == "Parcial" else "exact"
 
-        entries = fetch_entries(project_filter, start_date, end_date)
+        entries = fetch_entries(project_filter, start_date, end_date, match_mode=match_mode)
         self.current_entries = entries
         self.selected_entry_id = None
         self.edit_btn.setEnabled(False)
@@ -334,6 +341,7 @@ class MainWindow(QWidget):
 
     def clear_filters(self):
         self.filter_project_input.clear()
+        self.filter_mode_combo.setCurrentText("Exato")
         self.filter_start_date.setDate(QDate(2000, 1, 1))
         self.filter_end_date.setDate(QDate.currentDate())
         self.refresh_history()

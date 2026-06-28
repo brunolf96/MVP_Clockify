@@ -48,7 +48,7 @@ def insert_entry(project, description, start_time, end_time, duration_seconds):
     conn.close()
 
 
-def fetch_entries(project=None, start_date=None, end_date=None):
+def fetch_entries(project=None, start_date=None, end_date=None, match_mode="exact"):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
 
@@ -60,8 +60,12 @@ def fetch_entries(project=None, start_date=None, end_date=None):
     params = []
 
     if project:
-        query += " AND project LIKE ?"
-        params.append(f"%{project}%")
+        if match_mode == "partial":
+            query += " AND lower(project) LIKE lower(?)"
+            params.append(f"%{project}%")
+        else:
+            query += " AND lower(project) = lower(?)"
+            params.append(project)
 
     if start_date:
         query += " AND date(start_time) >= date(?)"
