@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QPushButton, QComboBox, QLineEdit, QLabel, QMessageBox,
     QTableWidget, QTableWidgetItem, QFileDialog, QHeaderView,
     QDialog, QDialogButtonBox, QDateEdit, QDateTimeEdit, QCheckBox,
-    QMenu, QListWidget, QListWidgetItem
+    QMenu, QListWidget, QListWidgetItem, QPlainTextEdit
 )
 
 from database import (
@@ -664,11 +664,47 @@ class MainWindow(QWidget):
 
     def show_report(self):
         report = build_report_text()
-        QMessageBox.information(self, "Relatório", report)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Relatório")
+        dialog.setModal(True)
+        dialog.setMinimumSize(700, 500)
+
+        layout = QVBoxLayout(dialog)
+        text_view = QPlainTextEdit()
+        text_view.setReadOnly(True)
+        text_view.setPlainText(report)
+        layout.addWidget(text_view)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close_button = button_box.button(QDialogButtonBox.StandardButton.Close)
+        if close_button:
+            close_button.setText("Fechar")
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.exec()
 
     def show_summary(self):
         summary = build_summary_text()
-        QMessageBox.information(self, "Resumo", summary)
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Resumo")
+        dialog.setModal(True)
+        dialog.setMinimumSize(700, 500)
+
+        layout = QVBoxLayout(dialog)
+        text_view = QPlainTextEdit()
+        text_view.setReadOnly(True)
+        text_view.setPlainText(summary)
+        layout.addWidget(text_view)
+
+        button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Close)
+        close_button = button_box.button(QDialogButtonBox.StandardButton.Close)
+        if close_button:
+            close_button.setText("Fechar")
+        button_box.rejected.connect(dialog.reject)
+        layout.addWidget(button_box)
+
+        dialog.exec()
 
     def toggle_column_preferences(self):
         self.column_preferences_group.setVisible(not self.column_preferences_group.isVisible())
