@@ -2,12 +2,12 @@ import csv
 import sqlite3
 from collections import defaultdict
 
-from database import DB_NAME
+import database
 from utils import format_seconds
 
 
 def get_all_entries():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(database.DB_NAME)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -23,7 +23,7 @@ def get_all_entries():
 
 
 def get_all_entries_with_id():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(database.DB_NAME)
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -48,7 +48,8 @@ def build_report_text():
 
     for entry_id, project, desc, start, end, duration in entries:
         date = start.split("T")[0] if start else ""
-        lines.append(f"[{entry_id}] Projeto: {project}")
+        lines.append(f"ID: {entry_id}")
+        lines.append(f"Projeto: {project}")
         lines.append(f"Descrição: {desc or ''}")
         lines.append(f"Data: {date}")
         lines.append(f"Duração: {format_seconds(duration or 0)}")

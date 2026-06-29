@@ -29,7 +29,8 @@ class ReportTests(unittest.TestCase):
 
         report = build_report_text()
 
-        self.assertIn("[1] Projeto: Projeto X", report)
+        self.assertIn("ID: 1", report)
+        self.assertIn("Projeto: Projeto X", report)
         self.assertIn("Descrição: Descrição X", report)
         self.assertIn("Data: 2026-06-01", report)
         self.assertIn("Duração: 01:00:00", report)
