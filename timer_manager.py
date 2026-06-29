@@ -1,7 +1,6 @@
 from datetime import datetime
-import sqlite3
 
-from database import DB_NAME
+from database import insert_entry
 
 class TimerManager:
     def __init__(self):
@@ -38,24 +37,10 @@ class TimerManager:
         self.description = None
 
     def _save_entry(self, end_time, duration):
-        conn = sqlite3.connect(DB_NAME)
-        cursor = conn.cursor()
-
-        cursor.execute("""
-        INSERT INTO time_entries (
-            project,
-            description,
-            start_time,
-            end_time,
-            duration_seconds
-        ) VALUES (?, ?, ?, ?, ?)
-        """, (
+        insert_entry(
             self.project,
             self.description,
             self.start_time.isoformat(),
             end_time.isoformat(),
             int(duration)
-        ))
-
-        conn.commit()
-        conn.close()
+        )

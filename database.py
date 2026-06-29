@@ -24,6 +24,62 @@ def init_db():
     conn.close()
 
 
+def reorder_entry_ids(conn: sqlite3.Connection | None = None):
+    should_close = conn is None
+    if should_close:
+        conn = sqlite3.connect(DB_NAME)
+
+    cursor = conn.cursor()
+    cursor.execute("""
+        SELECT id
+        FROM time_entries
+        ORDER BY date(start_time) ASC, time(start_time) ASC, id ASC
+    """)
+    ordered_ids = [row[0] for row in cursor.fetchall()]
+
+    cursor.execute("BEGIN")
+    try:
+        if not ordered_ids:
+            cursor.execute(
+                "INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES(?, ?)",
+                ("time_entries", 0)
+            )
+            conn.commit()
+            return
+
+        max_id = len(ordered_ids)
+        cursor.execute(
+            "INSERT OR REPLACE INTO sqlite_sequence(name, seq) VALUES(?, ?)",
+            ("time_entries", max_id)
+        )
+
+        id_updates = [
+            (old_id, new_id)
+            for new_id, old_id in enumerate(ordered_ids, start=1)
+            if old_id != new_id
+        ]
+
+        if id_updates:
+            for old_id, _ in id_updates:
+                cursor.execute(
+                    "UPDATE time_entries SET id = ? WHERE id = ?",
+                    (-old_id, old_id)
+                )
+            for old_id, new_id in id_updates:
+                cursor.execute(
+                    "UPDATE time_entries SET id = ? WHERE id = ?",
+                    (new_id, -old_id)
+                )
+
+        conn.commit()
+    except sqlite3.DatabaseError:
+        conn.rollback()
+        raise
+    finally:
+        if should_close:
+            conn.close()
+
+
 def insert_entry(project, description, start_time, end_time, duration_seconds):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
@@ -45,6 +101,7 @@ def insert_entry(project, description, start_time, end_time, duration_seconds):
     ))
 
     conn.commit()
+    reorder_entry_ids(conn)
     conn.close()
 
 
@@ -123,6 +180,7 @@ def update_entry(entry_id, project, description, start_time, end_time, duration_
     ))
 
     conn.commit()
+    reorder_entry_ids(conn)
     conn.close()
 
 
@@ -132,4 +190,5 @@ def delete_entry(entry_id):
 
     cursor.execute("DELETE FROM time_entries WHERE id = ?", (entry_id,))
     conn.commit()
+    reorder_entry_ids(conn)
     conn.close()

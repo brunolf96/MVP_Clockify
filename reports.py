@@ -13,7 +13,7 @@ def get_all_entries():
     cursor.execute("""
         SELECT project, description, start_time, end_time, duration_seconds
         FROM time_entries
-        ORDER BY start_time DESC
+        ORDER BY date(start_time) DESC, time(start_time) DESC, id DESC
     """)
 
     rows = cursor.fetchall()
@@ -29,7 +29,7 @@ def get_all_entries_with_id():
     cursor.execute("""
         SELECT id, project, description, start_time, end_time, duration_seconds
         FROM time_entries
-        ORDER BY start_time DESC
+        ORDER BY date(start_time) DESC, time(start_time) DESC, id DESC
     """)
 
     rows = cursor.fetchall()
