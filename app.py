@@ -2,7 +2,7 @@ import sys
 from datetime import date, datetime
 
 from PySide6.QtCore import QTimer, Qt, QDate, QDateTime
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QColor
 from PySide6.QtWidgets import (
     QApplication, QWidget, QVBoxLayout, QHBoxLayout, QFormLayout,
     QPushButton, QComboBox, QLineEdit, QLabel, QMessageBox,
@@ -204,6 +204,7 @@ class MainWindow(QWidget):
         self.current_entries = []
         self.visible_columns = load_visible_columns()
         self.tags = load_tags()
+        self.updating_table = False
 
         self.setup_ui()
 
@@ -317,12 +318,17 @@ class MainWindow(QWidget):
         header.setSectionResizeMode(QHeaderView.Stretch)
         self.history_table.setSelectionBehavior(QTableWidget.SelectItems)
         self.history_table.setSelectionMode(QTableWidget.ExtendedSelection)
-        self.history_table.setEditTriggers(QTableWidget.NoEditTriggers)
+        self.history_table.setEditTriggers(
+            QTableWidget.DoubleClicked |
+            QTableWidget.SelectedClicked |
+            QTableWidget.EditKeyPressed
+        )
         self.history_table.setSortingEnabled(True)
         self.history_table.setFocusPolicy(Qt.StrongFocus)
         self.history_table.setContextMenuPolicy(Qt.CustomContextMenu)
         self.history_table.customContextMenuRequested.connect(self.show_history_table_context_menu)
         self.history_table.itemSelectionChanged.connect(self.on_entry_selected)
+        self.history_table.itemChanged.connect(self.on_history_item_changed)
 
         self.summary_label = QLabel("Total: 00:00:00")
         self.summary_label.setAlignment(Qt.AlignRight)
@@ -368,6 +374,28 @@ class MainWindow(QWidget):
         layout.addLayout(top_layout)
         self.setLayout(layout)
 
+        self.setStyleSheet(
+            "QPushButton {"
+            " background-color: #1565C0;"
+            " color: white;"
+            " border: 1px solid #0D47A1;"
+            " border-radius: 6px;"
+            " padding: 6px 12px;"
+            " font-weight: 600;"
+            "}" 
+            "QPushButton:hover {"
+            " background-color: #1976D2;"
+            "}" 
+            "QPushButton:pressed {"
+            " background-color: #0D47A1;"
+            "}" 
+            "QPushButton:disabled {"
+            " background-color: #90A4AE;"
+            " color: #ECEFF1;"
+            " border-color: #78909C;"
+            "}"
+        )
+
         self.refresh_history()
         self.refresh_buttons()
 
@@ -397,6 +425,188 @@ class MainWindow(QWidget):
     def clear_project_input(self):
         self.project_input.setEditText("")
         self.project_input.setFocus()
+
+    def _get_column_index(self, column_name: str):
+        for index in range(self.history_table.columnCount()):
+            item = self.history_table.horizontalHeaderItem(index)
+            if item is not None and item.text() == column_name:
+                return index
+        return None
+
+    def _get_cell_text(self, row: int, column_name: str):
+        index = self._get_column_index(column_name)
+        if index is None:
+            return ""
+        item = self.history_table.item(row, index)
+        return item.text() if item is not None else ""
+
+    def _find_entry_by_id(self, entry_id: int):
+        return next((entry for entry in self.current_entries if entry[0] == entry_id), None)
+
+    def _parse_datetime(self, date_text: str, time_text: str):
+        if not date_text or not time_text:
+            raise ValueError("Data e hora são obrigatórias")
+        return datetime.fromisoformat(f"{date_text}T{time_text}")
+
+    def _set_row_error_state(self, row_index: int, error: bool):
+        color = QColor("#ffcdd2") if error else QColor("white")
+        for col in range(self.history_table.columnCount()):
+            item = self.history_table.item(row_index, col)
+            if item is not None:
+                item.setBackground(color)
+
+    def _validate_history_row(self, row_index: int) -> bool:
+        data_text = self._get_cell_text(row_index, "Data")
+        start_text = self._get_cell_text(row_index, "Início")
+        end_text = self._get_cell_text(row_index, "Fim")
+
+        if not data_text or not start_text or not end_text:
+            self._set_row_error_state(row_index, False)
+            return True
+
+        try:
+            start_dt = self._parse_datetime(data_text, start_text)
+            end_dt = self._parse_datetime(data_text, end_text)
+        except ValueError:
+            self._set_row_error_state(row_index, True)
+            return False
+
+        if end_dt <= start_dt:
+            self._set_row_error_state(row_index, True)
+            return False
+
+        for other_row in range(self.history_table.rowCount()):
+            if other_row == row_index:
+                continue
+
+            other_data = self._get_cell_text(other_row, "Data")
+            other_start = self._get_cell_text(other_row, "Início")
+            other_end = self._get_cell_text(other_row, "Fim")
+            if not other_data or not other_start or not other_end:
+                continue
+
+            try:
+                other_start_dt = self._parse_datetime(other_data, other_start)
+                other_end_dt = self._parse_datetime(other_data, other_end)
+            except ValueError:
+                continue
+
+            if start_dt < other_end_dt and end_dt > other_start_dt:
+                self._set_row_error_state(row_index, True)
+                return False
+
+        self._set_row_error_state(row_index, False)
+        return True
+
+    def _restore_history_cell(self, row: int, col: int, original_entry):
+        column_name = None
+        header_item = self.history_table.horizontalHeaderItem(col)
+        if header_item is not None:
+            column_name = header_item.text()
+
+        if column_name is None:
+            return
+
+        if column_name == "Projeto":
+            text = original_entry[1] or ""
+        elif column_name == "Descrição":
+            text = original_entry[2] or ""
+        elif column_name == "Data":
+            text = original_entry[3].split("T")[0]
+        elif column_name == "Início":
+            text = original_entry[3].split("T")[1]
+        elif column_name == "Fim":
+            text = original_entry[4].split("T")[1] if original_entry[4] else ""
+        elif column_name == "Duração":
+            text = format_seconds(original_entry[5] or 0)
+        else:
+            text = self._get_cell_text(row, column_name)
+
+        self.updating_table = True
+        try:
+            item = self.history_table.item(row, col)
+            if item is None:
+                item = QTableWidgetItem(text)
+                item.setTextAlignment(Qt.AlignCenter)
+            else:
+                item.setText(text)
+            self.history_table.setItem(row, col, item)
+            self.history_table.setCurrentCell(row, col)
+            self.history_table.setFocus()
+        finally:
+            self.updating_table = False
+
+    def on_history_item_changed(self, item):
+        if self.updating_table:
+            return
+
+        row = item.row()
+        col = item.column()
+        if col == 0:
+            return
+
+        id_item = self.history_table.item(row, 0)
+        if id_item is None:
+            return
+
+        try:
+            entry_id = int(id_item.text())
+        except ValueError:
+            return
+
+        original_entry = self._find_entry_by_id(entry_id)
+        if original_entry is None:
+            return
+
+        project = self._get_cell_text(row, "Projeto") or original_entry[1]
+        desc = self._get_cell_text(row, "Descrição") or original_entry[2] or ""
+
+        if self._get_column_index("Data") is not None:
+            date_text = self._get_cell_text(row, "Data") or original_entry[3].split("T")[0]
+        else:
+            date_text = original_entry[3].split("T")[0]
+
+        if self._get_column_index("Início") is not None:
+            start_time_text = self._get_cell_text(row, "Início") or original_entry[3].split("T")[1]
+        else:
+            start_time_text = original_entry[3].split("T")[1]
+
+        if self._get_column_index("Fim") is not None:
+            end_time_text = self._get_cell_text(row, "Fim") or original_entry[4].split("T")[1]
+        else:
+            end_time_text = original_entry[4].split("T")[1] if original_entry[4] else ""
+
+        try:
+            start_dt = self._parse_datetime(date_text, start_time_text)
+            end_date = date_text if self._get_column_index("Data") is not None else original_entry[4].split("T")[0]
+            end_dt = self._parse_datetime(end_date, end_time_text)
+        except ValueError:
+            QMessageBox.warning(self, "Aviso", "Formato de data/hora inválido. Use YYYY-MM-DD e HH:MM:SS.")
+            self.refresh_history()
+            return
+
+        if end_dt <= start_dt:
+            QMessageBox.warning(self, "Aviso", "O horário de fim deve ser depois do início.")
+            self.refresh_history()
+            return
+
+        start_iso = start_dt.isoformat()
+        end_iso = end_dt.isoformat()
+        duration = int((end_dt - start_dt).total_seconds())
+
+        if not self._validate_history_row(row):
+            self._restore_history_cell(row, col, original_entry)
+            QMessageBox.warning(self, "Aviso", "Registro inválido ou com sobreposição de horário.")
+            return
+
+        try:
+            update_entry(entry_id, project, desc, start_iso, end_iso, duration)
+        except ValueError as exc:
+            QMessageBox.warning(self, "Aviso", str(exc))
+            self.refresh_history()
+            return
+
+        self.refresh_history()
 
     def open_manage_tags_dialog(self):
         dialog = TagManagerDialog(self.tags, self)
@@ -488,65 +698,72 @@ class MainWindow(QWidget):
         self.refresh_history_table_data()
 
     def refresh_history_table_data(self):
-        entries = self.current_entries
-        self.history_table.setRowCount(len(entries))
-        total_seconds = 0
+        self.updating_table = True
+        try:
+            entries = self.current_entries
+            self.history_table.setRowCount(len(entries))
+            total_seconds = 0
 
-        visible_column_names = []
-        for index in range(1, self.history_table.columnCount()):
-            header_item = self.history_table.horizontalHeaderItem(index)
-            if header_item is not None:
-                visible_column_names.append(header_item.text())
+            visible_column_names = []
+            for index in range(1, self.history_table.columnCount()):
+                header_item = self.history_table.horizontalHeaderItem(index)
+                if header_item is not None:
+                    visible_column_names.append(header_item.text())
 
-        for row_index, row in enumerate(entries):
-            row_id = row[0]
-            id_item = QTableWidgetItem(str(row_id))
-            id_item.setTextAlignment(Qt.AlignCenter)
-            self.history_table.setItem(row_index, 0, id_item)
+            for row_index, row in enumerate(entries):
+                row_id = row[0]
+                id_item = QTableWidgetItem(str(row_id))
+                id_item.setTextAlignment(Qt.AlignCenter)
+                id_item.setFlags(id_item.flags() & ~Qt.ItemIsEditable)
+                self.history_table.setItem(row_index, 0, id_item)
 
-            for display_index, column_name in enumerate(visible_column_names, start=1):
-                source_index = None
-                if column_name == "Projeto":
-                    source_index = 1
-                elif column_name == "Descrição":
-                    source_index = 2
-                elif column_name in {"Data", "Início"}:
-                    source_index = 3
-                elif column_name == "Fim":
-                    source_index = 4
-                elif column_name == "Duração":
-                    source_index = 5
+                for display_index, column_name in enumerate(visible_column_names, start=1):
+                    source_index = None
+                    if column_name == "Projeto":
+                        source_index = 1
+                    elif column_name == "Descrição":
+                        source_index = 2
+                    elif column_name in {"Data", "Início"}:
+                        source_index = 3
+                    elif column_name == "Fim":
+                        source_index = 4
+                    elif column_name == "Duração":
+                        source_index = 5
 
-                if source_index is None:
-                    continue
+                    if source_index is None:
+                        continue
 
-                value = row[source_index]
-                cell_text = str(value or "")
-                if column_name == "Data" and value:
-                    try:
-                        cell_text = datetime.fromisoformat(value).strftime("%Y-%m-%d")
-                    except (TypeError, ValueError):
-                        cell_text = str(value or "")
-                elif column_name == "Início" and value:
-                    try:
-                        cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
-                    except (TypeError, ValueError):
-                        cell_text = str(value or "")
-                elif column_name == "Fim" and value:
-                    try:
-                        cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
-                    except (TypeError, ValueError):
-                        cell_text = str(value or "")
-                elif column_name == "Duração":
-                    cell_text = format_seconds(value or 0)
-                    total_seconds += value or 0
+                    value = row[source_index]
+                    cell_text = str(value or "")
+                    if column_name == "Data" and value:
+                        try:
+                            cell_text = datetime.fromisoformat(value).strftime("%Y-%m-%d")
+                        except (TypeError, ValueError):
+                            cell_text = str(value or "")
+                    elif column_name == "Início" and value:
+                        try:
+                            cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
+                        except (TypeError, ValueError):
+                            cell_text = str(value or "")
+                    elif column_name == "Fim" and value:
+                        try:
+                            cell_text = datetime.fromisoformat(value).strftime("%H:%M:%S")
+                        except (TypeError, ValueError):
+                            cell_text = str(value or "")
+                    elif column_name == "Duração":
+                        cell_text = format_seconds(value or 0)
+                        total_seconds += value or 0
 
-                item = QTableWidgetItem(cell_text)
-                item.setTextAlignment(Qt.AlignCenter)
-                self.history_table.setItem(row_index, display_index, item)
+                    item = QTableWidgetItem(cell_text)
+                    item.setTextAlignment(Qt.AlignCenter)
+                    if column_name == "Duração":
+                        item.setFlags(item.flags() & ~Qt.ItemIsEditable)
+                    self.history_table.setItem(row_index, display_index, item)
 
-        self.summary_label.setText(f"Total: {format_seconds(total_seconds)}")
-        self.update_today_label()
+            self.summary_label.setText(f"Total: {format_seconds(total_seconds)}")
+            self.update_today_label()
+        finally:
+            self.updating_table = False
 
     def show_history_table_context_menu(self, position):
         selected_items = self.history_table.selectedItems()
@@ -616,8 +833,12 @@ class MainWindow(QWidget):
         dialog = EntryDialog(self)
         if dialog.exec() == QDialog.Accepted:
             project, desc, start, end, duration = dialog.get_data()
-            insert_entry(project, desc, start, end, duration)
-            self.refresh_history()
+            try:
+                insert_entry(project, desc, start, end, duration)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Aviso", str(exc))
+            else:
+                self.refresh_history()
 
     def edit_selected_entry(self):
         if not self.selected_entry_id:
@@ -630,8 +851,12 @@ class MainWindow(QWidget):
         dialog = EntryDialog(self, entry)
         if dialog.exec() == QDialog.Accepted:
             project, desc, start, end, duration = dialog.get_data()
-            update_entry(self.selected_entry_id, project, desc, start, end, duration)
-            self.refresh_history()
+            try:
+                update_entry(self.selected_entry_id, project, desc, start, end, duration)
+            except ValueError as exc:
+                QMessageBox.warning(self, "Aviso", str(exc))
+            else:
+                self.refresh_history()
 
     def delete_selected_entry(self):
         if not self.selected_entry_id:

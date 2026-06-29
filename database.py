@@ -1,4 +1,5 @@
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -80,9 +81,40 @@ def reorder_entry_ids(conn: sqlite3.Connection | None = None):
             conn.close()
 
 
+def _ensure_no_overlap(conn, start_time, end_time, exclude_id=None):
+    if start_time is None or end_time is None:
+        return
+
+    try:
+        start_dt = datetime.fromisoformat(start_time)
+        end_dt = datetime.fromisoformat(end_time)
+    except ValueError:
+        raise ValueError("Formato de data/hora inválido.")
+
+    if end_dt <= start_dt:
+        raise ValueError("O horário de término deve ser depois do início.")
+
+    query = """
+        SELECT id, start_time, end_time
+        FROM time_entries
+        WHERE start_time < ? AND end_time > ?
+    """
+    params = [end_time, start_time]
+    if exclude_id is not None:
+        query += " AND id != ?"
+        params.append(exclude_id)
+
+    cursor = conn.cursor()
+    cursor.execute(query, params)
+    if cursor.fetchone():
+        raise ValueError("Já existe um registro com intervalo de tempo sobreposto.")
+
+
 def insert_entry(project, description, start_time, end_time, duration_seconds):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    _ensure_no_overlap(conn, start_time, end_time)
 
     cursor.execute("""
         INSERT INTO time_entries (
@@ -161,6 +193,8 @@ def fetch_projects():
 def update_entry(entry_id, project, description, start_time, end_time, duration_seconds):
     conn = sqlite3.connect(DB_NAME)
     cursor = conn.cursor()
+
+    _ensure_no_overlap(conn, start_time, end_time, exclude_id=entry_id)
 
     cursor.execute("""
         UPDATE time_entries
