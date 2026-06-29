@@ -218,6 +218,9 @@ class MainWindow(QWidget):
         self.project_input.setInsertPolicy(QComboBox.NoInsert)
         self.load_project_list()
 
+        self.clear_project_btn = QPushButton("Limpar projeto")
+        self.clear_project_btn.clicked.connect(self.clear_project_input)
+
         self.tag_buttons_widget = QWidget()
         self.tag_buttons_layout = QHBoxLayout(self.tag_buttons_widget)
         self.tag_buttons_layout.setContentsMargins(0, 0, 0, 0)
@@ -342,6 +345,7 @@ class MainWindow(QWidget):
         self.update_table_columns()
 
         form_layout.addWidget(self.project_input)
+        form_layout.addWidget(self.clear_project_btn)
         form_layout.addWidget(self.tag_buttons_widget)
         form_layout.addWidget(self.manage_tags_btn)
         form_layout.addWidget(self.desc_input)
@@ -388,6 +392,10 @@ class MainWindow(QWidget):
 
     def _apply_tag_to_project(self, tag: str):
         self.project_input.setEditText(tag)
+        self.project_input.setFocus()
+
+    def clear_project_input(self):
+        self.project_input.setEditText("")
         self.project_input.setFocus()
 
     def open_manage_tags_dialog(self):
