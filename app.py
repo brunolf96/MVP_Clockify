@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
     QPushButton, QComboBox, QLineEdit, QLabel, QMessageBox,
     QTableWidget, QTableWidgetItem, QFileDialog, QHeaderView,
     QDialog, QDialogButtonBox, QDateEdit, QDateTimeEdit, QCheckBox,
-    QMenu
+    QMenu, QListWidget, QListWidgetItem
 )
 
 from database import (
@@ -26,7 +26,13 @@ from reports import (
 )
 from timer_manager import TimerManager
 from utils import format_seconds
-from preferences import DEFAULT_VISIBLE_COLUMNS, load_visible_columns, save_visible_columns
+from preferences import (
+    DEFAULT_VISIBLE_COLUMNS,
+    load_visible_columns,
+    save_visible_columns,
+    load_tags,
+    save_tags,
+)
 
 
 class EntryDialog(QDialog):
@@ -109,6 +115,80 @@ class EntryDialog(QDialog):
         )
 
 
+class TagManagerDialog(QDialog):
+    def __init__(self, tags, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("Gerenciar tags")
+        self.setMinimumWidth(420)
+
+        self.tags = list(tags or [])
+
+        self.tag_input = QLineEdit()
+        self.tag_input.setPlaceholderText("Adicionar nova tag")
+
+        self.add_tag_btn = QPushButton("Adicionar")
+        self.add_tag_btn.clicked.connect(self.add_tag)
+
+        self.tag_list = QListWidget()
+        self.tag_list.setSelectionMode(QListWidget.SingleSelection)
+        self.refresh_tag_list()
+
+        self.remove_tag_btn = QPushButton("Remover selecionada")
+        self.remove_tag_btn.clicked.connect(self.remove_selected_tag)
+
+        button_layout = QHBoxLayout()
+        button_layout.addWidget(self.tag_input)
+        button_layout.addWidget(self.add_tag_btn)
+
+        layout = QVBoxLayout()
+        layout.addLayout(button_layout)
+        layout.addWidget(self.tag_list)
+        layout.addWidget(self.remove_tag_btn)
+
+        dialog_buttons = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
+        )
+        ok_button = dialog_buttons.button(QDialogButtonBox.StandardButton.Ok)
+        cancel_button = dialog_buttons.button(QDialogButtonBox.StandardButton.Cancel)
+        if ok_button:
+            ok_button.setText("Salvar")
+        if cancel_button:
+            cancel_button.setText("Cancelar")
+        dialog_buttons.accepted.connect(self.accept)
+        dialog_buttons.rejected.connect(self.reject)
+
+        layout.addWidget(dialog_buttons)
+        self.setLayout(layout)
+
+    def refresh_tag_list(self):
+        self.tag_list.clear()
+        for tag in self.tags:
+            item = QListWidgetItem(tag)
+            self.tag_list.addItem(item)
+
+    def add_tag(self):
+        tag = self.tag_input.text().strip()
+        if not tag:
+            return
+        if tag not in self.tags:
+            self.tags.append(tag)
+            self.refresh_tag_list()
+        self.tag_input.clear()
+
+    def remove_selected_tag(self):
+        selected_items = self.tag_list.selectedItems()
+        if not selected_items:
+            return
+        for item in selected_items:
+            tag = item.text()
+            if tag in self.tags:
+                self.tags.remove(tag)
+        self.refresh_tag_list()
+
+    def get_tags(self):
+        return list(self.tags)
+
+
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
@@ -123,6 +203,7 @@ class MainWindow(QWidget):
         self.selected_entry_id = None
         self.current_entries = []
         self.visible_columns = load_visible_columns()
+        self.tags = load_tags()
 
         self.setup_ui()
 
@@ -136,6 +217,15 @@ class MainWindow(QWidget):
         self.project_input.setEditable(True)
         self.project_input.setInsertPolicy(QComboBox.NoInsert)
         self.load_project_list()
+
+        self.tag_buttons_widget = QWidget()
+        self.tag_buttons_layout = QHBoxLayout(self.tag_buttons_widget)
+        self.tag_buttons_layout.setContentsMargins(0, 0, 0, 0)
+        self.tag_buttons_layout.setSpacing(4)
+        self.update_tag_buttons()
+
+        self.manage_tags_btn = QPushButton("Gerenciar tags")
+        self.manage_tags_btn.clicked.connect(self.open_manage_tags_dialog)
 
         self.desc_input = QLineEdit()
         self.desc_input.setPlaceholderText("Descrição (opcional)")
@@ -252,6 +342,8 @@ class MainWindow(QWidget):
         self.update_table_columns()
 
         form_layout.addWidget(self.project_input)
+        form_layout.addWidget(self.tag_buttons_widget)
+        form_layout.addWidget(self.manage_tags_btn)
         form_layout.addWidget(self.desc_input)
         form_layout.addWidget(self.elapsed_label)
         form_layout.addWidget(self.today_label)
@@ -278,6 +370,28 @@ class MainWindow(QWidget):
     def refresh_buttons(self):
         self.start_btn.setEnabled(not self.timer.running)
         self.stop_btn.setEnabled(self.timer.running)
+
+    def update_tag_buttons(self):
+        while self.tag_buttons_layout.count():
+            item = self.tag_buttons_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+        for tag in self.tags:
+            button = QPushButton(tag)
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda checked, value=tag: self.project_input.setEditText(value))
+            self.tag_buttons_layout.addWidget(button)
+
+        self.tag_buttons_layout.addStretch()
+
+    def open_manage_tags_dialog(self):
+        dialog = TagManagerDialog(self.tags, self)
+        if dialog.exec() == QDialog.Accepted:
+            self.tags = dialog.get_tags()
+            save_tags(self.tags)
+            self.update_tag_buttons()
 
     def load_project_list(self):
         current_text = self.project_input.currentText() if self.project_input.count() else ""
