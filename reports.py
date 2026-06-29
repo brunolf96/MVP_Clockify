@@ -47,10 +47,10 @@ def build_report_text():
     lines = ["===== HISTÓRICO =====", ""]
 
     for entry_id, project, desc, start, end, duration in entries:
-        lines.append(f"[{entry_id}] {project}")
+        date = start.split("T")[0] if start else ""
+        lines.append(f"[{entry_id}] Projeto: {project}")
         lines.append(f"Descrição: {desc or ''}")
-        lines.append(f"Início: {start or ''}")
-        lines.append(f"Fim: {end or ''}")
+        lines.append(f"Data: {date}")
         lines.append(f"Duração: {format_seconds(duration or 0)}")
         lines.append("-" * 30)
 
