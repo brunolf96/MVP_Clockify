@@ -381,10 +381,14 @@ class MainWindow(QWidget):
         for tag in self.tags:
             button = QPushButton(tag)
             button.setCursor(Qt.PointingHandCursor)
-            button.clicked.connect(lambda checked, value=tag: self.project_input.setEditText(value))
+            button.clicked.connect(lambda checked, value=tag: self._apply_tag_to_project(value))
             self.tag_buttons_layout.addWidget(button)
 
         self.tag_buttons_layout.addStretch()
+
+    def _apply_tag_to_project(self, tag: str):
+        self.project_input.setEditText(tag)
+        self.project_input.setFocus()
 
     def open_manage_tags_dialog(self):
         dialog = TagManagerDialog(self.tags, self)
