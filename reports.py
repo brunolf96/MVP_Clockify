@@ -5,9 +5,15 @@ from collections import defaultdict
 import database
 from utils import format_seconds
 
+DB_NAME = database.DB_NAME
+
+
+def get_db_name():
+    return database.DB_NAME
+
 
 def get_all_entries():
-    conn = sqlite3.connect(database.DB_NAME)
+    conn = sqlite3.connect(get_db_name())
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -23,7 +29,7 @@ def get_all_entries():
 
 
 def get_all_entries_with_id():
-    conn = sqlite3.connect(database.DB_NAME)
+    conn = sqlite3.connect(get_db_name())
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -59,7 +65,7 @@ def build_report_text():
 
 
 def build_summary_text():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(get_db_name())
     cursor = conn.cursor()
 
     cursor.execute("""
@@ -112,7 +118,7 @@ def print_report():
 
 
 def project_summary():
-    conn = sqlite3.connect(DB_NAME)
+    conn = sqlite3.connect(get_db_name())
     cursor = conn.cursor()
 
     cursor.execute("""
